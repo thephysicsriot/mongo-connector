@@ -535,13 +535,21 @@ class OplogThread(threading.Thread):
 
         LOG.debug("OplogThread: Dumping set of collections %s " % dump_set)
 
-        def docs_to_dump(from_coll):
+        def docs_to_dump(from_coll, start_id=None):
             last_id = None
             attempts = 0
             projection = self.namespace_config.projection(from_coll.full_name)
             # Loop to handle possible AutoReconnect
             while attempts < 60:
-                if last_id is None:
+                if start_id is not None:
+                    cursor = retry_until_ok(
+                        from_coll.find,
+                        {"_id": {"$gt": start_id}},
+                        projection=projection,
+                        sort=[("_id", pymongo.ASCENDING)]
+                    )
+                    start_id = None
+                elif last_id is None:
                     cursor = retry_until_ok(
                         from_coll.find,
                         projection=projection,
